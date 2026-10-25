@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Communities on the Canvas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a viewer. The canvas is the page; controls sit in a strip beside it (below on phones), the timeline of the largest communities runs underneath. */
+:root {
+  --bg: #f3f2ee; --panel: #ffffff; --ink: #1d1c1a; --muted: #6b6862; --line: #d9d6cf; --accent: #0083c7; --warn: #a65b00; --warn-bg: #fbecd8;
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #151514; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9c998f; --line: #34332f; --accent: #4fb3e8; --warn: #f0a650; --warn-bg: #3a2a14; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #151514; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9c998f; --line: #34332f; --accent: #4fb3e8; --warn: #f0a650; --warn-bg: #3a2a14; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 18px; }
+h1 { font: 700 clamp(26px, 4vw, 38px)/1.1 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.lede { margin: 6px 0 0; color: var(--muted); max-width: 68ch; }
+.lede a { color: var(--accent); }
+.viewer { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+@media (max-width: 860px) { .viewer { grid-template-columns: minmax(0, 1fr); } }
+.stage { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px; }
+.stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; image-rendering: pixelated; max-width: 100%; cursor: crosshair; }
+.loading { position: absolute; inset: 8px; display: grid; place-items: center; color: var(--muted); font: 13px var(--mono); pointer-events: none; }
+.side { display: grid; gap: 16px; min-width: 0; }
+.group { display: grid; gap: 6px; }
+.label { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.seg button { font: 500 13px var(--mono); padding: 5px 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 3px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.seg button:disabled { opacity: 0.4; cursor: not-allowed; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip { font: 12px/1.4 var(--body); padding: 6px 8px; border-radius: 3px; background: var(--warn-bg); color: var(--warn); }
+.chip.ok { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.clock { font: 500 20px var(--mono); font-variant-numeric: tabular-nums; }
+.clock small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.play { font: 500 13px var(--mono); padding: 6px 12px; border: 1px solid var(--ink); background: var(--ink); color: var(--bg); border-radius: 3px; cursor: pointer; min-width: 72px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.info { font: 13px/1.5 var(--mono); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 10px; min-height: 96px; }
+.info .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.info .dim { color: var(--muted); }
+.slider { font: 12px var(--mono); color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.slider b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+.fstat { font: 12px/1.45 var(--body); color: var(--muted); }
+#fusebox.off .slider, #fusebox.off input, #fusebox.off .seg { opacity: 0.45; }
+#fusebox.off .fstat { color: var(--warn); }
+.timeline { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 12px; display: grid; gap: 8px; min-width: 0; }
+.timeline .head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.timeline h2 { font: 700 17px var(--display); margin: 0; }
+.tl-scroll { overflow-x: auto; }
+#tl { display: block; width: 100%; min-width: 640px; height: auto; cursor: pointer; }
+.legend { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font: 11px var(--mono); color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; color: var(--muted); font-size: 14px; }
+.notes h3 { font: 700 14px var(--display); color: var(--ink); margin: 0 0 4px; }
+.notes p { margin: 0; max-width: 62ch; }
+.foot { margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--line, currentColor); color: var(--muted); font-size: 13px; }
+.foot a { color: inherit; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Communities on the canvas</h1>
+    <p class="lede">r/place 2017, every 15 minutes from launch to close. Accounts are linked when they placed the same colour in the same small cell within the same time slot; Leiden finds communities in the 2 hours before each frame, and a community keeps its colour while most of its members stay together. Exploratory: these communities are not checked against the habit null here. <a href="about.html">How this works, and a glossary</a>.</p>
+  </header>
+
+  <div class="viewer">
+    <div class="stage">
+      <canvas id="cv" width="1000" height="1000" aria-label="The r/place canvas with community colours over it"></canvas>
+      <div class="loading" id="loading">Loading canvas…</div>
+    </div>
+
+    <aside class="side">
+      <div class="group">
+        <div class="clock" id="clock">—<small>—</small></div>
+        <input type="range" id="frame" min="0" max="286" value="95" aria-label="Frame">
+        <div class="row">
+          <button class="play" id="play">Play</button>
+          <div class="seg" id="speed" aria-label="Speed">
+            <button data-v="2" aria-pressed="false">2×</button><button data-v="6" aria-pressed="true">6×</button><button data-v="15" aria-pressed="false">15×</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="label">Cell size</span>
+        <div class="seg" id="rsel"></div>
+        <span class="label">Time slot</span>
+        <div class="seg" id="tsel"></div>
+        <div class="chip" id="cred"></div>
+      </div>
+
+      <div class="group">
+        <span class="label">Community colour</span>
+        <input type="range" id="alpha" min="0" max="100" value="80" aria-label="Community colour strength">
+        <span class="label">Layer</span>
+        <div class="seg" id="layer"><button data-v="comm" aria-pressed="true">communities</button><button data-v="cont" aria-pressed="false">contested ground</button></div>
+        <div class="group" id="contbox" hidden>
+          <span class="label">Count a group that held a cell for at least</span>
+          <div class="seg" id="hold"><button data-v="1" aria-pressed="false">1 h</button><button data-v="2" aria-pressed="true">2 h</button><button data-v="4" aria-pressed="false">4 h</button></div>
+          <div class="legend">groups so far: <i style="background:#f2c14e"></i>2 <i style="background:#f08a24"></i>3 <i style="background:#d9480f"></i>4 <i style="background:#8a1c0b"></i>5+</div>
+        </div>
+        <span class="label">Canvas underneath</span>
+        <div class="seg" id="base">
+          <button data-v="grey" aria-pressed="true">grey</button><button data-v="colour" aria-pressed="false">colour</button><button data-v="off" aria-pressed="false">off</button>
+        </div>
+      </div>
+
+      <div class="group" id="fusebox">
+        <span class="label">Fuse communities</span>
+        <div class="seg" id="fuse"><button data-v="on" aria-pressed="true">fused</button><button data-v="off" aria-pressed="false">separate</button></div>
+        <span class="label">Tracks</span>
+        <div class="seg" id="tracks"><button data-v="followed" aria-pressed="true">as followed</button><button data-v="split" aria-pressed="false">split when they move</button></div>
+        <label class="slider" for="fm"><span>members in common at least</span><b id="fmv">30%</b></label>
+        <input type="range" id="fm" min="10" max="100" value="30">
+        <label class="slider" for="ff"><span>or cells in common at least</span><b id="ffv">30%</b></label>
+        <input type="range" id="ff" min="15" max="100" value="30">
+        <label class="slider" for="fg"><span>with a gap of at most</span><b id="fgv">2 h</b></label>
+        <input type="range" id="fg" min="0" max="16" value="8">
+        <div class="fstat" id="fstat"></div>
+      </div>
+
+      <div class="info" id="info"><span class="dim">Point at the canvas to see which community a cell belongs to. Click a row in the timeline to pick out one community.</span></div>
+    </aside>
+  </div>
+
+  <section class="timeline">
+    <div class="head">
+      <h2 id="tlhead">The 30 largest communities</h2>
+      <span class="label" id="tlnote">darker = more accounts at that time · dashed = cooldown changes</span>
+    </div>
+    <div class="tl-scroll"><canvas id="tl" width="1300" height="420" aria-label="Timeline of the largest communities"></canvas></div>
+  </section>
+
+  <section class="notes">
+    <div><h3>How a cell gets its colour</h3><p>The canvas is cut into 4 × 4 px cells. Each cell takes the colour of the community whose members made most of its placements in the 30 minutes before the frame; its opacity is that community's share of them. Placements by accounts in no community, or in communities that never reached 10 accounts, are left uncoloured.</p></div>
+    <div><h3>Which settings to trust</h3><p>On synthetic canvases with known groups, this method recovers them once cells are 5 px or larger, at any slot length. With 1 px cells it fails unless the slot is an hour, so those settings are marked.</p></div>
+    <div><h3>How communities are fused</h3><p>A community is followed from frame to frame while at least 30% of its accounts carry over; otherwise a new row starts, so one artwork can hold several rows (crews change overnight, or two crews work side by side). Fusing joins two rows when enough of their regular members are in common (accounts in a row for at least two frames; shared accounts as a share of both rows' accounts together), or when enough of their cells are in common, measured the same way, and one starts within the gap of the other ending. Shares are of both rows together, not of the smaller one: otherwise every small row inside a giant one fuses with it and everything chains into one group. Names come from the 2017 /r/place Atlas (Roland Rytz, AGPL-3.0) and are used only as labels and as a check, never to decide a fusion.</p></div>
+    <div><h3>How a group gets its names</h3><p>The atlas outlines show the final canvas, so a group is named stretch by stretch, every 2 hours. A cell it held counts towards an artwork only if, at that time, it already looked like the final canvas there, and only towards the smallest outline it lies in (outlines such as "USA / Canvas Center" or "European Union" sit over the artworks inside them). A stretch is "unnamed" when under a fifth of what the group held survives to the end, as with the Void, whose black was painted over; it takes an artwork's name when that artwork has half of the surviving cells, "A / B" when two share it, and "mixed" otherwise. Small text on a timeline row marks where its name changes.</p></div>
+    <div><h3>Contested ground</h3><p>Each cell is coloured by how many groups held it, up to the frame shown, for at least the chosen time in total (held = its majority community in a frame). Fusing changes the count, since fused rows are one group. Point at a cell to see who held it and when. Places that changed hands, like the centre (the Void, then the purple corner, then the USA flag), stand out.</p></div>
+    <div><h3>Split tracks</h3><p>A community is followed while 30% of its accounts carry over, so over a day a row can drift from one artwork to another (the Germany row into France and the European Union, the First Void row into Mona Lisa). "Split when they move" cuts a row where less than 30% of the cells it held in its first 2 hours are among those it held in the last 2 hours; a row that only grows is not cut. Cut pieces are fused by cells only, since a piece has the same members as the one before it. Both views are kept; neither replaces the other.</p></div>
+    <div><h3>What a colour does not mean</h3><p>A community is a set of accounts that kept painting the same places and colours at the same times. It is not a declared faction, and the same artwork can hold several communities, or one community can work on several artworks.</p></div>
+  </section>
+  <p class="foot">Part of <a href="https://thechesirecat.github.io/rplace-2017/">r/place 2017 as a complex system</a>. Data: the r/place 2017 placement log released by Reddit. Artwork names: the 2017 /r/place Atlas (Roland Rytz, AGPL-3.0).</p>
+</div>
+
+<script>
+(() => {
+  const PAL = ['#FFFFFF','#E4E4E4','#888888','#222222','#FFA7D1','#E50000','#E59500','#A06A42','#E5D900','#94E044','#02BE01','#00D3DD','#0083C7','#0000EA','#CF6EE4','#820080'];
+  const PRGB = PAL.map(h => [1,3,5].map(i => parseInt(h.slice(i, i + 2), 16)));
+  const N = 1000, G = 250;
+  const $ = id => document.getElementById(id);
+  const cv = $('cv');
+  const tl = $('tl'), tctx = tl.getContext('2d');
+  let idx = null, frame = 95, setting = null, playing = false, speed = 6, base = 'grey', alpha = 0.8, pick = 0;
+  let layer = 'comm', holdH = 2, tracks = 'followed';
+  const canvasCache = new Map(), ovCache = new Map(), linCache = new Map();
+  function remember(cache, key, make, keep) {          // a small cache of chunk promises, oldest dropped first
+    if (cache.has(key)) { const v = cache.get(key); cache.delete(key); cache.set(key, v); return v; }
+    const v = make(); cache.set(key, v);
+    while (cache.size > keep) cache.delete(cache.keys().next().value);
+    return v;
+  }
+
+  // chunks are lossless greyscale PNGs; each pixel's grey value is one byte. A worker decodes them (and undoes the
+  // canvas chunks' XOR between frames) off the main thread, so playback stays smooth; without one, the page does it.
+  const DECODE = `
+    async function bytes(url) {
+      const res = await fetch(url); if (!res.ok) throw new Error(url + ' ' + res.status);
+      const bmp = await createImageBitmap(await res.blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+      const c = new OffscreenCanvas(bmp.width, bmp.height), g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(bmp, 0, 0);
+      const px = g.getImageData(0, 0, bmp.width, bmp.height).data, out = new Uint8Array(px.length / 4);
+      for (let i = 0; i < out.length; i++) out[i] = px[i * 4];
+      return out;
+    }
+    function unxor(b, F) { for (let o = F; o < b.length; o += F) for (let i = 0; i < F; i++) b[o + i] ^= b[o - F + i]; return b; }
+    onmessage = async e => {
+      const { id, url, xor } = e.data;
+      try { const b = await bytes(url); if (xor) unxor(b, xor); postMessage({ id, b }, [b.buffer]); }
+      catch (err) { postMessage({ id, err: String(err) }); }
+    };`;
+  let worker = null; const waiting = new Map(); let nextId = 0;
+  try {
+    if (typeof OffscreenCanvas === 'undefined') throw 0;
+    worker = new Worker(URL.createObjectURL(new Blob([DECODE], { type: 'text/javascript' })));
+    worker.onmessage = e => { const w = waiting.get(e.data.id); waiting.delete(e.data.id); e.data.err ? w.reject(new Error(e.data.err)) : w.resolve(e.data.b); };
+  } catch (_) { worker = null; }
+  async function bytesHere(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(url + ' ' + res.status);
+    const bmp = await createImageBitmap(await res.blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+    const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+    const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(bmp, 0, 0);
+    const px = g.getImageData(0, 0, bmp.width, bmp.height).data, out = new Uint8Array(px.length / 4);
+    for (let i = 0; i < out.length; i++) out[i] = px[i * 4];
+    return out;
+  }
+  function bytesOf(url, xor = 0) {
+    if (worker) return new Promise((resolve, reject) => {
+      const id = nextId++; waiting.set(id, { resolve, reject });
+      worker.postMessage({ id, url: new URL(url, location.href).href, xor });
+    });
+    return bytesHere(url).then(b => { if (xor) for (let o = xor; o < b.length; o += xor) for (let i = 0; i < xor; i++) b[o + i] ^= b[o - xor + i]; return b; });
+  }
+  // canvas chunk: frames XOR'd with the one before (the first whole), 4 bits per pixel
+  function canvasChunk(c) {
+    const F = N * N / 2;
+    return remember(canvasCache, c, () => bytesOf(`canvas/c${c}.png`, F).then(b => {
+      const out = []; for (let o = 0; o < b.length; o += F) out.push(b.subarray(o, o + F)); return out;
+    }), 12);
+  }
+  function ovChunk(s, c) { return remember(ovCache, s + '/' + c, () => bytesOf(`${s}/o${c}.png`), 8); }
+  async function lineages(s) {
+    if (!linCache.has(s)) linCache.set(s, fetch(`${s}/lineages.json`).then(r => r.json()));
+    return linCache.get(s);
+  }
+  const hue = i => (i * 137.508) % 360;
+  function hsl(h, s, l) {
+    s /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return [255 * f(0), 255 * f(8), 255 * f(4)].map(Math.round);
+  }
+  const linRGB = i => hsl(hue(i), 85, 52);
+  const css = rgb => `rgb(${rgb.join(',')})`;
+
+  const credible = s => { const [r, t] = s.slice(1).split('-t').map(Number); return !(r === 1 && t <= 30); };
+  function when(k) {
+    const t = new Date(idx.launch_us / 1000 + (k + 1) * idx.frame_minutes * 60000);
+    const d = t.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+    const hm = t.toISOString().slice(11, 16);
+    return [`${d} ${hm}`, `UTC · ${((k + 1) * idx.frame_minutes / 60).toFixed(2)} h since launch`];
+  }
+
+  // ---- WebGL2 renderer: the canvas, the overlay and the palette live in textures; a shader mixes them
+  const gl = cv.getContext('webgl2', { antialias: false });
+  if (!gl) { $('loading').textContent = 'This viewer needs WebGL2, which this browser does not offer.'; throw new Error('no webgl2'); }
+  const VS = `#version 300 es
+  in vec2 p; out vec2 v;
+  void main() { v = vec2(p.x * 0.5 + 0.5, 0.5 - p.y * 0.5); gl_Position = vec4(p, 0.0, 1.0); }`;
+  const FS = `#version 300 es
+  precision highp float; precision highp int; precision highp usampler2D;
+  in vec2 v; out vec4 o;
+  uniform usampler2D uCanvas, uIds, uDom, uLut, uCont;
+  uniform vec3 uPal[16];
+  uniform int uBase, uHasOv, uMode; uniform float uAlpha; uniform uint uPick;
+  vec3 hsl(float h, float s, float l) { vec3 k = mod(vec3(0.0, 8.0, 4.0) + h / 30.0, 12.0); float a = s * min(l, 1.0 - l);
+    return l - a * clamp(min(k - 3.0, 9.0 - k), -1.0, 1.0); }
+  void main() {
+    ivec2 q = clamp(ivec2(floor(v * 1000.0)), ivec2(0), ivec2(999));
+    uint b = texelFetch(uCanvas, ivec2(q.x >> 1, q.y), 0).r;
+    uint c = (q.x & 1) == 1 ? (b & 15u) : (b >> 4u);
+    vec3 col = uPal[int(c)];
+    if (uBase == 1) { float y = dot(col, vec3(0.3, 0.59, 0.11)); col = vec3((150.0 + 0.4 * 255.0 * y) / 255.0); }
+    else if (uBase == 2) { col = vec3(238.0 / 255.0); }
+    if (uMode == 1) {                                // contested ground: groups that held the cell so far
+      uint m = texelFetch(uCont, q >> 2, 0).r;
+      if (m >= 2u) {
+        vec3 rc = m == 2u ? vec3(0.949, 0.757, 0.306) : m == 3u ? vec3(0.941, 0.541, 0.141) : m == 4u ? vec3(0.851, 0.282, 0.059) : vec3(0.541, 0.110, 0.043);
+        col = mix(col, rc, uAlpha);
+      }
+    } else if (uHasOv == 1) {
+      ivec2 g = q >> 2;
+      uint id = texelFetch(uIds, g, 0).r;
+      if (id > 0u) id = texelFetch(uLut, ivec2(int(id & 255u), int(id >> 8u)), 0).r;   // the fused group
+      if (id > 0u) {
+        float w = uAlpha * float(texelFetch(uDom, g, 0).r) / 255.0;
+        if (uPick > 0u && id != uPick) w *= 0.12;
+        col = mix(col, hsl(mod(float(id) * 137.508, 360.0), 0.85, 0.52), w);
+      } else if (uPick > 0u) { col = col * 0.6 + 90.0 / 255.0; }
+    }
+    o = vec4(col, 1.0);
+  }`;
+  function shader(type, src) { const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh)); return sh; }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = n => gl.getUniformLocation(prog, n);
+  gl.uniform3fv(U('uPal'), new Float32Array(PRGB.flat().map(x => x / 255)));
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  function tex(unit, name, w, h, ifmt, fmt, type) {
+    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
+    for (const k of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, k, gl.NEAREST);
+    for (const k of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, k, gl.CLAMP_TO_EDGE);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, ifmt, w, h); gl.uniform1i(U(name), unit);
+    return data => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, fmt, type, data); };
+  }
+  const upCanvas = tex(0, 'uCanvas', N / 2, N, gl.R8UI, gl.RED_INTEGER, gl.UNSIGNED_BYTE);
+  const upIds = tex(1, 'uIds', G, G, gl.R16UI, gl.RED_INTEGER, gl.UNSIGNED_SHORT);
+  const upDom = tex(2, 'uDom', G, G, gl.R8UI, gl.RED_INTEGER, gl.UNSIGNED_BYTE);
+  const upLut = tex(3, 'uLut', 256, 256, gl.R16UI, gl.RED_INTEGER, gl.UNSIGNED_SHORT);
+  const upCont = tex(4, 'uCont', G, G, gl.R8UI, gl.RED_INTEGER, gl.UNSIGNED_BYTE);
+  const contBuf = new Uint8Array(G * G); upCont(contBuf);
+  const ident = new Uint16Array(65536); for (let i = 0; i < 65536; i++) ident[i] = i;
+  upLut(ident);
+  function render() {
+    gl.viewport(0, 0, cv.width, cv.height);
+    gl.uniform1i(U('uBase'), base === 'grey' ? 1 : base === 'off' ? 2 : 0);
+    gl.uniform1i(U('uHasOv'), curIds ? 1 : 0); gl.uniform1i(U('uMode'), layer === 'cont' && curHeld ? 1 : 0);
+    gl.uniform1f(U('uAlpha'), alpha); gl.uniform1ui(U('uPick'), pick);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  let curIds = null, curDom = null, curLin = null, shown = -1, shownSetting = null;
+  let token = 0;
+  async function load(k, s) {
+    const cf = (await canvasChunk(Math.floor(k / idx.canvas_chunk)))[k % idx.canvas_chunk];
+    let ov = null, lin = null;
+    if (s) {
+      const blob = await ovChunk(s, Math.floor(k / idx.overlay_chunk)); lin = await lineages(s);
+      const o = (k % idx.overlay_chunk) * G * G * 3;
+      ov = { ids: new Uint16Array(blob.buffer.slice(o, o + G * G * 2)), dom: blob.subarray(o + G * G * 2, o + G * G * 3) };
+    }
+    return { cf, ov, lin };
+  }
+  function prefetch(k) {                               // warm the next chunks so playback does not stall
+    const c = Math.floor(k / idx.canvas_chunk) + 1; if (c * idx.canvas_chunk < idx.frames) canvasChunk(c);
+    const o = Math.floor(k / idx.overlay_chunk) + 1; if (setting && o * idx.overlay_chunk < idx.frames) ovChunk(setting, o);
+  }
+  async function draw() {
+    const my = ++token, k = frame, s = setting;
+    const [a, b] = when(k); $('clock').innerHTML = `${a}<small>${b}</small>`;
+    if (k === shown && s === shownSetting) { refresh(); render(); drawTimeline(); return; }
+    const { cf, ov, lin } = await load(k, s);
+    const fd = s ? await fuseData(s) : null;
+    const ex = s ? await extraData(s) : null;
+    if (my !== token) return;
+    $('loading').hidden = true;
+    upCanvas(cf);
+    if (ov) { upIds(ov.ids); upDom(ov.dom); }
+    const changed = s !== shownSetting;
+    curIds = ov && ov.ids; curDom = ov && ov.dom; curLin = lin; shown = k; shownSetting = s;
+    if (changed) { curFuse = fd; curExtra = ex && ex.x; curHeld = ex && ex.held; regroup(); }
+    else refresh();
+    render(); drawTimeline(); prefetch(k);
+  }
+  // ---- fusing: union-find over the candidate pairs that pass the sliders; a group is named after its largest row
+  const fuseCache = new Map();
+  function fuseData(s) {
+    if (!idx.fused || !idx.fused.includes(s)) return Promise.resolve(null);
+    if (!fuseCache.has(s)) fuseCache.set(s, fetch(`${s}/fuse.json`).then(r => r.json()));
+    return fuseCache.get(s);
+  }
+  // extras: names by 2-hour window, pieces of tracks split when they move, and who held each cell
+  const extraCache = new Map();
+  function extraData(s) {
+    if (!idx.extras || !idx.extras.includes(s)) return Promise.resolve(null);
+    if (!extraCache.has(s)) extraCache.set(s, Promise.all([fetch(`${s}/extra.json`).then(r => r.json()), bytesOf(`${s}/held.png`)]).then(([x, b]) => {
+      x.byLin = new Map(); for (const row of x.name_rows) { if (!x.byLin.has(row[0])) x.byLin.set(row[0], []); x.byLin.get(row[0]).push(row); }
+      x.piecesOf = new Map(); x.pieces.forEach(([L, a], p) => { if (!x.piecesOf.has(L)) x.piecesOf.set(L, []); x.piecesOf.get(L).push([a, p + 1]); });
+      const count = b.subarray(0, G * G), start = new Uint32Array(G * G + 1);
+      for (let c = 0; c < G * G; c++) start[c + 1] = start[c] + count[c];
+      const H = start[G * G], body = new Uint16Array(b.buffer.slice(b.byteOffset + G * G, b.byteOffset + G * G + H * 8));
+      return { x, held: { start, body } };
+    }));
+    return extraCache.get(s);
+  }
+  let fz = { on: true, M: 30, F: 30, Gp: 8 }, groups = null, lut = ident, curFuse = null, curExtra = null, curHeld = null;
+  let units = [], root = null;                         // units: rows (as followed) or pieces (split); root: unit ▸ group
+  function regroup() {
+    const lin = curLin; if (!lin) { groups = null; return; }
+    const fd = curFuse, ex = curExtra, split = tracks === 'split' && !!ex;
+    units = split ? ex.pieces.map(([L, a, z]) => { const [b, si] = lin.lineages[L - 1]; return [a, si.slice(a - b, z - b + 1), L]; })
+                  : lin.lineages.map(([b, si], i) => [b, si, i + 1]);
+    const n = units.length + 1, par = new Int32Array(n);
+    for (let i = 0; i < n; i++) par[i] = i;
+    const find = i => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
+    const join = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) { if (ra < rb) par[rb] = ra; else par[ra] = rb; } };
+    if (fz.on && split) { for (const [a, b, f, g] of ex.piece_pairs) if (f >= fz.F && g <= fz.Gp) join(a, b); }
+    else if (fz.on && fd) { for (const [a, b, m, f, g] of fd.pairs) if (m >= fz.M || (f >= fz.F && g <= fz.Gp)) join(a, b); }
+    root = new Int32Array(n); for (let i = 1; i < n; i++) root[i] = find(i);
+    const G_ = new Map();
+    for (let i = 1; i < n; i++) { const r = root[i]; if (!G_.has(r)) G_.set(r, []); G_.get(r).push(i); }
+    groups = [];
+    for (const [r, mem] of G_) {
+      let b = Infinity, e = -1;
+      for (const i of mem) { const [bi, si] = units[i - 1]; b = Math.min(b, bi); e = Math.max(e, bi + si.length - 1); }
+      const sizes = new Array(e - b + 1).fill(0);
+      for (const i of mem) { const [bi, si] = units[i - 1]; si.forEach((v, q) => { sizes[bi - b + q] += v; }); }
+      groups.push({ id: r, mem, rows: mem.length, birth: b, sizes, peak: Math.max(...sizes) });
+    }
+    groups.sort((x, y) => y.peak - x.peak);
+    groups.byId = new Map(groups.map(g => [g.id, g]));
+    frameLut(frame, true);
+    // the fusing controls: members need fuse.json and the rows as followed; cells need fuse.json or the split pieces
+    const canM = !!fd && !split, canF = split || !!fd;
+    $('fm').disabled = !canM; $('ff').disabled = !canF; $('fg').disabled = !canF;
+    $('fuse').querySelectorAll('button').forEach(x => { x.disabled = !canF; });
+    $('tracks').querySelectorAll('button').forEach(x => { x.disabled = !ex; });
+    $('layer').querySelector('[data-v="cont"]').disabled = !curHeld;
+    $('fusebox').classList.toggle('off', !canF);
+    const top = groups.slice(0, 30), named = top.filter(g => label(overall(g)).kind === 2).length;
+    const changes = top.filter(g => stretches(g).filter(t => t.kind === 2).map(t => t.t).filter((t, i, a) => i === 0 || t !== a[i - 1]).length > 1).length;
+    const nm = ex ? ` Of the 30 largest, ${named} carry an atlas name over their life and ${changes} change name along the way.` : '';
+    $('fstat').textContent = split ? `${lin.lineages.length} rows ▸ ${n - 1} pieces after cutting rows that move away ▸ ${groups.length} groups, fused by cells only (a piece has the same members as the one before it).${nm}`
+      : fd ? `${n - 1} rows ▸ ${groups.length} groups.${nm}`
+      : `Fusing is not available for this setting yet: it was computed before the runs saved each community's members, and is being recomputed. The timeline shows the separate rows${ex ? '; "split when they move" works, fusing by cells' : ''}.${nm}`;
+    $('tlhead').textContent = (canF && fz.on ? 'The 30 largest fused groups' : 'The 30 largest communities') + (split ? ', tracks split when they move' : '');
+    contested(true);
+  }
+  // lineage ▸ group for the frame shown: as followed it never changes; split, a lineage maps to the piece alive at k
+  let lutFrame = -1;
+  function unitOf(L, k) {
+    if (!(tracks === 'split' && curExtra)) return L;
+    const ps = curExtra.piecesOf.get(L); if (!ps) return 0;
+    let u = ps[0][1]; for (const [a, p] of ps) { if (a <= k) u = p; else break; } return u;
+  }
+  function frameLut(k, force) {
+    if (!root) return;
+    if (!force && (k === lutFrame || !(tracks === 'split' && curExtra))) return;
+    lut = new Uint16Array(65536);
+    const nL = curLin.lineages.length;
+    for (let L = 1; L <= nL && L < 65536; L++) { const u = unitOf(L, k); lut[L] = u ? root[u] : 0; }
+    for (let i = nL + 1; i < 65536; i++) lut[i] = i;
+    lut[0] = 0; upLut(lut); lutFrame = k;
+  }
+  // names by 2-hour window, summed over the group's rows or pieces
+  function series(g) {
+    if (g.ns !== undefined) return g.ns;
+    const ex = curExtra; if (!ex) return (g.ns = null);
+    const W = ex.win, out = new Map();
+    for (const u of g.mem) {
+      const [b, si, L] = units[u - 1], e = b + si.length - 1;
+      for (const row of ex.byLin.get(L) || []) {
+        const w = row[1]; if (w * W + W - 1 < b || w * W > e) continue;
+        let o = out.get(w); if (!o) { o = { h: 0, s: 0, v: new Map() }; out.set(w, o); }
+        o.h += row[2]; o.s += row[3];
+        for (let q = 4; q < row.length; q += 2) o.v.set(row[q], (o.v.get(row[q]) || 0) + row[q + 1]);
+      }
+    }
+    return (g.ns = out);
+  }
+  function overall(g) {
+    const ns = series(g); if (!ns) return null;
+    const o = { h: 0, s: 0, v: new Map() };
+    for (const x of ns.values()) { o.h += x.h; o.s += x.s; for (const [a, c] of x.v) o.v.set(a, (o.v.get(a) || 0) + c); }
+    return o;
+  }
+  function label(o) {
+    if (!o || !o.h) return { kind: -1, t: '' };
+    if (o.s < 0.2 * o.h) return { kind: 0, t: 'unnamed', why: `${Math.round(100 * o.s / o.h)}% of what it held survives to the end` };
+    const v = [...o.v].sort((x, y) => y[1] - x[1]), N_ = curExtra.names;
+    const [a, ca] = v[0] || [-1, 0], [b, cb] = v[1] || [-1, 0];
+    if (ca >= 0.5 * o.s) return { kind: 2, t: N_[a], why: `${Math.round(100 * ca / o.s)}% of its surviving cells` };
+    if (b >= 0 && cb >= 0.6 * ca && ca + cb >= 0.5 * o.s) return { kind: 2, t: `${N_[a]} / ${N_[b]}`, why: `${Math.round(100 * (ca + cb) / o.s)}% of its surviving cells` };
+    return { kind: 1, t: 'mixed', why: a >= 0 ? `most surviving cells in ${N_[a]} (${Math.round(100 * ca / o.s)}%)` : '' };
+  }
+  function stretches(g) {                              // consecutive windows with the same label
+    if (g.st) return g.st;
+    const ns = series(g), out = []; if (!ns) return (g.st = out);
+    const W = curExtra.win, e = g.birth + g.sizes.length - 1;
+    for (let w = Math.floor(g.birth / W); w <= Math.floor(e / W); w++) {
+      const l = label(ns.get(w)), a = Math.max(g.birth, w * W), z = Math.min(e, w * W + W - 1);
+      const prev = out[out.length - 1];
+      if (prev && prev.t === l.t) prev.z = z; else out.push({ ...l, a, z });
+    }
+    return (g.st = out);
+  }
+  // contested ground: per cell, the groups that held it for at least holdH hours in total up to the frame shown
+  let contFrame = -1;
+  function holdersOf(c, k) {
+    const { start, body } = curHeld, out = new Map();
+    for (let h = start[c]; h < start[c + 1]; h++) {
+      const L = body[h * 4], f0 = body[h * 4 + 1], f1 = body[h * 4 + 2], fr = body[h * 4 + 3];
+      if (f0 > k) continue;
+      const u = unitOf(L, f0), gid = u ? root[u] : 0; if (!gid) continue;
+      const d = Math.min(fr, k - f0 + 1), o = out.get(gid);
+      if (o) { o.d += d; o.a = Math.min(o.a, f0); o.z = Math.max(o.z, Math.min(f1, k)); } else out.set(gid, { d, a: f0, z: Math.min(f1, k) });
+    }
+    return out;
+  }
+  function contested(force) {
+    if (layer !== 'cont' || !curHeld || !root) return;
+    if (!force && frame === contFrame) return;
+    const need = holdH * 60 / idx.frame_minutes;
+    for (let c = 0; c < G * G; c++) {
+      if (curHeld.start[c] === curHeld.start[c + 1]) { contBuf[c] = 0; continue; }
+      let m = 0; for (const o of holdersOf(c, frame).values()) if (o.d >= need) m++;
+      contBuf[c] = Math.min(m, 255);
+    }
+    upCont(contBuf); contFrame = frame;
+  }
+  function refresh() { frameLut(frame); contested(); }
+  for (const [id, key, fmt] of [['fm', 'M', v => v + '%'], ['ff', 'F', v => v + '%'], ['fg', 'Gp', v => (v * idx_minutes() / 60) + ' h']]) {
+    $(id).addEventListener('input', e => { fz[key] = +e.target.value; $(id + 'v').textContent = fmt(+e.target.value); regroup(); render(); drawTimeline(); });
+  }
+  function idx_minutes() { return idx ? idx.frame_minutes : 15; }
+  $('fuse').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; fz.on = b.dataset.v === 'on';
+    $('fuse').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); pick = 0; regroup(); render(); drawTimeline(); });
+
+  const rgbCache = new Map();                      // lineage colours, computed once each
+  function cachedLin(i) { let v = rgbCache.get(i); if (!v) { v = linRGB(i); rgbCache.set(i, v); } return v; }
+
+  const TL_L = 270;
+  const COOLDOWN = [[4 + 10 / 60, 10], [5 + 41 / 60, 5], [7 + 10 / 60, 10], [10 + 3 / 60, 20], [12, 15], [12 + 27 / 60, 10], [28.5, 5]];
+  function drawTimeline() {
+    const W = tl.width, H = tl.height, lin = curLin;
+    const ink = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+    const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+    const bgc = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim();
+    tctx.clearRect(0, 0, W, H);
+    tctx.font = '12px "IBM Plex Mono", monospace'; tctx.textBaseline = 'middle';
+    if (!lin) { tctx.fillStyle = muted; tctx.fillText('Pick a setting to see its communities.', 10, 20); return; }
+    const rows = (groups || []).slice(0, 30), L = TL_L, plotW = W - L - 10, rh = (H - 44) / 30, n = idx.frames;
+    rows.forEach((g, j) => {
+      const { birth, sizes, peak, id } = g, c = cachedLin(id), y = 4 + j * rh;
+      tctx.fillStyle = (pick && pick !== id) ? muted : ink;
+      const ol = label(overall(g)), nm = ol.kind === 2 ? ol.t : ol.kind === 1 ? `mixed · community ${id}` : ol.kind === 0 ? `unnamed · community ${id}` : `community ${id}`;
+      const lab = (nm.length > 22 ? nm.slice(0, 21) + '…' : nm) + (g.rows > 1 ? ` ×${g.rows}` : '');
+      tctx.fillText(lab, 6, y + rh / 2);
+      tctx.fillStyle = muted; tctx.fillText(String(peak), L - 46, y + rh / 2);
+      sizes.forEach((s, q) => {
+        if (!s) return;
+        tctx.globalAlpha = (pick && pick !== id ? 0.15 : 1) * (0.15 + 0.85 * s / peak);
+        tctx.fillStyle = css(c);
+        tctx.fillRect(L + (birth + q) / n * plotW, y + 1, Math.max(1, plotW / n), rh - 2);
+      });
+      tctx.globalAlpha = 1;
+      // where the name changes: a tick, and the new name when there is room
+      const st = stretches(g); if (st.length < 2 && !(st.length === 1 && st[0].kind === 2 && ol.kind !== 2)) return;
+      tctx.save(); tctx.font = '10px "IBM Plex Mono", monospace';
+      st.forEach((t, q) => {
+        const x0 = L + t.a / n * plotW, x1 = L + (t.z + 1) / n * plotW;
+        if (q > 0) { tctx.fillStyle = ink; tctx.fillRect(x0 - 0.5, y, 1.5, rh); }
+        const txt = t.kind === 2 ? t.t : t.kind === 0 ? 'unnamed' : t.kind === 1 ? 'mixed' : '';
+        if (!txt || (pick && pick !== id)) return;
+        const w = tctx.measureText(txt).width; if (w + 6 > x1 - x0) return;
+        tctx.lineWidth = 3; tctx.strokeStyle = bgc; tctx.strokeText(txt, x0 + 3, y + rh / 2);
+        tctx.fillStyle = ink; tctx.fillText(txt, x0 + 3, y + rh / 2);
+      });
+      tctx.restore();
+    });
+    // cooldown switches (hours since launch, new cooldown in minutes), from the cooldown history in chapter 2
+    const hx = h => L + (h * 4 - 0.5) / n * plotW;
+    tctx.save(); tctx.strokeStyle = muted; tctx.lineWidth = 1; tctx.setLineDash([4, 4]);
+    for (const [h] of COOLDOWN) { tctx.beginPath(); tctx.moveTo(hx(h), 0); tctx.lineTo(hx(h), H - 36); tctx.stroke(); }
+    tctx.restore();
+    tctx.font = '10px "IBM Plex Mono", monospace'; tctx.fillStyle = muted;
+    const lastX = [-1e9, -1e9];
+    for (const [h, m] of COOLDOWN) {
+      const xx = hx(h), row = xx - lastX[0] > 46 ? 0 : 1; lastX[row] = xx;
+      tctx.fillText(`${m} min`, xx - 14, row === 0 ? H - 15 : H - 5);
+    }
+    tctx.font = '12px "IBM Plex Mono", monospace';
+    const x = L + (frame + 0.5) / n * plotW;
+    tctx.fillStyle = ink; tctx.fillRect(x - 0.5, 0, 1.5, H - 36);
+    tctx.fillStyle = muted;
+    for (let h = 0; h <= 72; h += 12) { const xx = L + (h * 4 - 1) / n * plotW; tctx.fillText(`${h} h`, Math.max(L, xx - 10), H - 28); }
+  }
+
+  const hr = k => ((k + 1) * idx.frame_minutes / 60).toFixed(1);
+  function gname(g, k) {                               // the group's name at frame k, and over its life
+    const st = stretches(g), now = st.find(t => t.a <= k && k <= t.z), ol = label(overall(g));
+    return { now, ol, title: ol.kind === 2 ? ol.t : `community ${g.id}` };
+  }
+  function info(ev) {
+    if (!curIds) return;
+    const rc = cv.getBoundingClientRect();
+    const x = Math.floor((ev.clientX - rc.left) / rc.width * N), y = Math.floor((ev.clientY - rc.top) / rc.height * N);
+    if (x < 0 || y < 0 || x >= N || y >= N) return;
+    const ci = (y >> 2) * G + (x >> 2), id = curIds[ci];
+    if (layer === 'cont' && curHeld) {
+      const hs = [...holdersOf(ci, frame)].filter(([, o]) => o.d >= holdH * 60 / idx.frame_minutes).sort((p, q) => p[1].a - q[1].a);
+      if (!hs.length) { $('info').innerHTML = `<span class="dim">(${x}, ${y})</span><br>No group has held this cell for ${holdH} h so far.`; return; }
+      $('info').innerHTML = `<span class="dim">(${x}, ${y}) · held for ${holdH} h or more by ${hs.length} group${hs.length > 1 ? 's' : ''} so far</span><br>` +
+        hs.slice(0, 7).map(([gid, o]) => { const g = groups.byId.get(gid), t = g ? stretches(g).find(s_ => s_.a <= o.a && o.a <= s_.z) : null;
+          return `<span class="sw" style="background:${css(cachedLin(gid))}"></span>${t && t.kind === 2 ? t.t : t ? t.t + ' · community ' + gid : 'community ' + gid} <span class="dim">h ${hr(o.a - 1)}–${hr(o.z)}, ${(o.d * idx.frame_minutes / 60).toFixed(1)} h</span>`; }).join('<br>') +
+        (hs.length > 7 ? `<br><span class="dim">and ${hs.length - 7} more</span>` : '');
+      return;
+    }
+    if (!id || !lut[id]) { $('info').innerHTML = `<span class="dim">(${x}, ${y})</span><br>No community of 10+ accounts painted here in the last 30 minutes.`; return; }
+    const g = groups.byId.get(lut[id]);
+    const { birth, sizes, peak } = g, now = sizes[frame - birth] || 0, last = birth + sizes.length - 1;
+    const dur = ((sizes.length) * idx.frame_minutes / 60).toFixed(1);
+    const nmg = gname(g, frame), st = stretches(g).filter(t => t.kind >= 0);
+    const named = st.filter(t => t.kind === 2);
+    const path = named.length ? named.map(t => `${t.t} <span class="dim">(h ${hr(t.a - 1)}–${hr(t.z)})</span>`).filter((t, i, a) => i === 0 || t !== a[i - 1]).slice(0, 4).join(' ▸ ') : '';
+    // mostly inside: the largest of the group's rows that sits mostly inside a row of another group
+    let ins = '';
+    if (curFuse && curFuse.inside && tracks !== 'split') {
+      if (!curFuse.insideOf) { curFuse.insideOf = new Map(curFuse.inside.map(([i, j, p]) => [i, [j, p]])); }
+      for (const u of [...g.mem].sort((p, q) => p - q)) {
+        const hit = curFuse.insideOf.get(u); if (!hit) continue;
+        const og = groups.byId.get(root[hit[0]]); if (!og || og.id === g.id) continue;
+        ins = `<br><span class="dim">mostly inside ${gname(og, frame).title}: ${hit[1]}% of ${g.rows === 1 ? 'its' : "one of its rows'"} regular members are in that group's largest row</span>`; break;
+      }
+    }
+    $('info').innerHTML = `<span class="sw" style="background:${css(cachedLin(g.id))}"></span>${nmg.title} <span class="dim">(${x}, ${y})</span><br>` +
+      `${now} accounts now · peak ${peak}` + (g.rows > 1 ? ` · ${g.rows} ${tracks === 'split' ? 'pieces' : 'rows'} fused` : '') + `<br>` +
+      `<span class="dim">from ${when(birth)[0]} to ${when(last)[0]} (${dur} h)</span><br>` +
+      (nmg.now ? `<span class="dim">now: ${nmg.now.t}${nmg.now.why ? ' · ' + nmg.now.why : ''}</span><br>` : '') +
+      (path ? `<span class="dim">named: </span>${path}<br>` : '') +
+      `<span class="dim">${Math.round(curDom[ci] / 2.55)}% of this cell's placements in the last 30 min</span>` + ins;
+  }
+
+  function segs() {
+    const have = new Set(idx.settings);
+    const rs = [1, 5, 10, 15], ts = [5, 15, 30, 60];
+    let [r0, t0] = setting ? setting.slice(1).split('-t').map(Number) : [5, 15];
+    $('rsel').innerHTML = rs.map(r => `<button data-v="${r}" aria-pressed="${r === r0}">${r} px</button>`).join('');
+    $('tsel').innerHTML = ts.map(t => `<button data-v="${t}" aria-pressed="${t === t0}">${t} min</button>`).join('');
+    $('rsel').querySelectorAll('button').forEach(b => { b.disabled = !ts.some(t => have.has(`r${b.dataset.v}-t${t}`)); });
+    $('tsel').querySelectorAll('button').forEach(b => { b.disabled = !have.has(`r${r0}-t${b.dataset.v}`); });
+    const c = $('cred');
+    if (!setting) { c.className = 'chip'; c.textContent = 'This setting is still computing.'; }
+    else if (credible(setting)) { c.className = 'chip ok'; c.textContent = 'This setting recovers planted groups on synthetic canvases.'; }
+    else { c.className = 'chip'; c.textContent = 'Not credible: with 1 px cells and slots of 30 min or less, the method fails on synthetic canvases.'; }
+  }
+  function choose(r, t) {
+    const have = new Set(idx.settings);
+    if (!have.has(`r${r}-t${t}`)) { const alt = [60, 30, 15, 5].find(tt => have.has(`r${r}-t${tt}`)); if (alt) t = alt; }
+    setting = have.has(`r${r}-t${t}`) ? `r${r}-t${t}` : null; pick = 0;
+    segs(); draw();
+  }
+  $('rsel').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled) return; const t = setting ? +setting.split('-t')[1] : 15; choose(+b.dataset.v, t); });
+  $('tsel').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled) return; const r = setting ? +setting.slice(1).split('-t')[0] : 5; choose(r, +b.dataset.v); });
+  $('layer').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled) return; layer = b.dataset.v;
+    $('layer').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); $('contbox').hidden = layer !== 'cont'; contested(true); render(); });
+  $('hold').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; holdH = +b.dataset.v;
+    $('hold').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); contested(true); render(); });
+  $('tracks').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled) return; tracks = b.dataset.v;
+    $('tracks').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); pick = 0; regroup(); render(); drawTimeline(); });
+  $('base').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; base = b.dataset.v; $('base').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
+  $('speed').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; speed = +b.dataset.v; $('speed').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+  $('alpha').addEventListener('input', e => { alpha = e.target.value / 100; render(); });
+  $('frame').addEventListener('input', e => { frame = +e.target.value; draw(); });
+  cv.addEventListener('mousemove', info);
+  cv.addEventListener('click', ev => {
+    if (!curIds) return; const rc = cv.getBoundingClientRect();
+    const x = Math.floor((ev.clientX - rc.left) / rc.width * N), y = Math.floor((ev.clientY - rc.top) / rc.height * N);
+    const id = lut[curIds[(y >> 2) * G + (x >> 2)]]; pick = (id && id !== pick) ? id : 0; render(); drawTimeline();
+  });
+  tl.addEventListener('click', ev => {
+    const rc = tl.getBoundingClientRect(), y = (ev.clientY - rc.top) / rc.height * tl.height, x = (ev.clientX - rc.left) / rc.width * tl.width;
+    const j = Math.floor((y - 4) / ((tl.height - 44) / 30));
+    if (x > TL_L) { frame = Math.max(0, Math.min(idx.frames - 1, Math.round((x - TL_L) / (tl.width - TL_L - 10) * idx.frames))); $('frame').value = frame; }
+    if (j >= 0 && j < 30 && x <= TL_L && groups && groups[j]) { const id = groups[j].id; pick = (pick === id) ? 0 : id; }
+    draw();
+  });
+  let last = 0, busy = false;
+  function tick(t) {
+    if (!playing) return;
+    if (!busy && t - last >= 1000 / speed) {
+      last = t; busy = true;
+      frame = (frame + 1) % idx.frames; $('frame').value = frame;
+      draw().finally(() => { busy = false; });
+    }
+    requestAnimationFrame(tick);
+  }
+  $('play').addEventListener('click', () => {
+    playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play';
+    if (playing) requestAnimationFrame(tick);
+  });
+
+  fetch('index.json').then(r => r.json()).then(j => {
+    idx = j; $('frame').max = j.frames - 1; frame = Math.min(frame, j.frames - 1); $('frame').value = frame;
+    const pref = ['r5-t15', 'r5-t30', 'r10-t15', 'r5-t60', 'r1-t60', 'r1-t30', 'r1-t15', 'r1-t5'].find(s => j.settings.includes(s)) || j.settings[0];
+    const [r, t] = pref.slice(1).split('-t').map(Number);
+    choose(r, t);
+  }).catch(err => { $('loading').textContent = 'Could not load the data: ' + err.message; });
+})();
+</script>
+
+</body>
+</html>
